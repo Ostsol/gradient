@@ -44,7 +44,9 @@ func DrawHLinear(dst draw.Image, x0, x1 float64, stops []Stop) {
 		panic(fmt.Sprintf("invalid bounds x0(%f)>x1(%f)", x0, x1))
 	}
 
-    if len(stops) == 0 { return }
+	if len(stops) == 0 {
+		return
+	}
 
 	bb := dst.Bounds()
 	width := bb.Dx()
@@ -83,7 +85,9 @@ func DrawVLinear(dst draw.Image, y0, y1 float64, stops []Stop) {
 		panic(fmt.Sprintf("invalid bounds y0(%f)>y1(%f)", y0, y1))
 	}
 
-    if len(stops) == 0 { return }
+	if len(stops) == 0 {
+		return
+	}
 
 	bb := dst.Bounds()
 	height := bb.Dy()
@@ -129,7 +133,9 @@ func DrawLinear(dst draw.Image, x0, y0, x1, y1 float64, stops []Stop) {
 		return
 	}
 
-    if len(stops) == 0 { return }
+	if len(stops) == 0 {
+		return
+	}
 
 	if y0 > y1 {
 		panic(fmt.Sprintf("invalid bounds y0(%f)>y1(%f)", y0, y1))
