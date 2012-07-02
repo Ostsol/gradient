@@ -40,6 +40,12 @@ func collerp(c0, c1 color.Color, x float64) color.Color {
 // DrawHLinear draws a linear gradient to dst, and is optimized for producing a
 // purely horizontal gradient.
 func DrawHLinear(dst draw.Image, x0, x1 float64, stops []Stop) {
+	if x0 > x1 {
+		panic(fmt.Sprintf("invalid bounds x0(%f)>x1(%f)", x0, x1))
+	}
+
+    if len(stops) == 0 { return }
+
 	bb := dst.Bounds()
 	width := bb.Dx()
 
@@ -73,6 +79,12 @@ func DrawHLinear(dst draw.Image, x0, x1 float64, stops []Stop) {
 // DrawVLinear draws a linear gradient to dst, and is optimized for producing a
 // purely vertical gradient.
 func DrawVLinear(dst draw.Image, y0, y1 float64, stops []Stop) {
+	if y0 > y1 {
+		panic(fmt.Sprintf("invalid bounds y0(%f)>y1(%f)", y0, y1))
+	}
+
+    if len(stops) == 0 { return }
+
 	bb := dst.Bounds()
 	height := bb.Dy()
 
@@ -107,22 +119,23 @@ func DrawVLinear(dst draw.Image, y0, y1 float64, stops []Stop) {
 // defined by x0, y0, x1, and y1) is found to be purely horizontal or purely
 // vertical, the appropriate optimized functions will be called.
 func DrawLinear(dst draw.Image, x0, y0, x1, y1 float64, stops []Stop) {
-	if x0 > x1 {
-		panic(fmt.Sprintf("invalid bounds x0(%f)>x1(%f)", x0, x1))
-	}
-
 	if y0 == y1 && x0 != x1 {
 		DrawHLinear(dst, x0, x1, stops)
 		return
 	}
 
-	if y0 > y1 {
-		panic(fmt.Sprintf("invalid bounds y0(%f)>y1(%f)", y0, y1))
-	}
-
 	if x0 == x1 && y0 != y1 {
 		DrawVLinear(dst, y0, y1, stops)
 		return
+	}
+
+    if len(stops) == 0 { return }
+
+	if y0 > y1 {
+		panic(fmt.Sprintf("invalid bounds y0(%f)>y1(%f)", y0, y1))
+	}
+	if x0 > x1 {
+		panic(fmt.Sprintf("invalid bounds x0(%f)>x1(%f)", x0, x1))
 	}
 
 	bb := dst.Bounds()
