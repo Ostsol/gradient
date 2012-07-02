@@ -52,10 +52,9 @@ func DrawHLinear(dst draw.Image, x0, x1 float64, stops []Stop) {
 		fx := float64(x)
 		if fx < x0 {
 			col = stops[0].Col
-		} else if fx > x1 {
-			col = stops[len(stops)-1].Col
 		} else {
 			d := (fx - x0) / dx
+			col = stops[len(stops)-1].Col
 			for i, stop := range stops[1:] {
 				if d < stop.X {
 					d = (d - stops[i].X) / (stop.X - stops[i].X)
@@ -86,10 +85,9 @@ func DrawVLinear(dst draw.Image, y0, y1 float64, stops []Stop) {
 		fy := float64(y)
 		if fy < y0 {
 			col = stops[0].Col
-		} else if fy > y1 {
-			col = stops[len(stops)-1].Col
 		} else {
 			d := (fy - y0) / dy
+			col = stops[len(stops)-1].Col
 			for i, stop := range stops[1:] {
 				if d < stop.X {
 					d = (d - stops[i].X) / (stop.X - stops[i].X)
@@ -156,9 +154,8 @@ func DrawLinear(dst draw.Image, x0, y0, x1, y1 float64, stops []Stop) {
 
 				if d < stops[0].X {
 					col = stops[0].Col
-				} else if d > stops[len(stops)-1].X {
-					col = stops[len(stops)-1].Col
 				} else {
+					col = stops[len(stops)-1].Col
 					// iterate through stops to find the colour range
 					for i, st := range stops[1:] {
 						if d < st.X {
