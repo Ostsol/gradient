@@ -1,0 +1,1 @@
+This package is written in *[http://golang.org Go]* and provides an API for drawing gradients. As of yet, only linear gradients are supported. This package is under development and the API is not necessarily final.
