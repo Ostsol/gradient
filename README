@@ -1,1 +1,1 @@
-This package is written in *[http://golang.org Go]* and provides an API for drawing gradients. As of yet, only linear gradients are supported. This package is under development and the API is not necessarily final.
+This package is written in *[http://golang.org Go]* and provides an API for drawing linear and radial gradients. As of yet, the API is not guaranteed to be final and may be changed in non-backward compatible ways.

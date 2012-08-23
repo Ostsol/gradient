@@ -37,9 +37,33 @@ func collerp(c0, c1 color.Color, x float64) color.Color {
 		lerp(a0, a1, x)}
 }
 
-// DrawHLinear draws a linear gradient to dst, and is optimized for producing a
+// getColour iterates through the gradient stops to find the stop in which the
+// pixel resides and returns an interpolated colour.
+
+func getColour(rat float64, stops []Stop) color.Color {
+	if rat <= 0.0 || len(stops) == 1 {
+		return stops[0].Col
+	}
+
+	last := stops[len(stops)-1]
+
+	if rat >= last.X {
+		return last.Col
+	}
+
+	for i, stop := range stops[1:] {
+		if rat < stop.X {
+			rat = (rat - stops[i].X) / (stop.X - stops[i].X)
+			return collerp(stops[i].Col, stop.Col, rat)
+		}
+	}
+
+	return last.Col
+}
+
+// drawHLinear draws a linear gradient to dst, and is optimized for producing a
 // purely horizontal gradient.
-func DrawHLinear(dst draw.Image, x0, x1 float64, stops []Stop) {
+func drawHLinear(dst draw.Image, x0, x1 float64, stops []Stop) {
 	if x0 > x1 {
 		panic(fmt.Sprintf("invalid bounds x0(%f)>x1(%f)", x0, x1))
 	}
@@ -54,23 +78,8 @@ func DrawHLinear(dst draw.Image, x0, x1 float64, stops []Stop) {
 	x0, x1 = x0*float64(width), x1*float64(width)
 	dx := x1 - x0
 
-	var col color.Color
-
 	for x := 0; x < width; x++ {
-		fx := float64(x)
-		if fx < x0 {
-			col = stops[0].Col
-		} else {
-			d := (fx - x0) / dx
-			col = stops[len(stops)-1].Col
-			for i, stop := range stops[1:] {
-				if d < stop.X {
-					d = (d - stops[i].X) / (stop.X - stops[i].X)
-					col = collerp(stops[i].Col, stop.Col, d)
-					break
-				}
-			}
-		}
+		col := getColour((float64(x)-x0)/dx, stops)
 
 		for y := bb.Min.Y; y < bb.Max.Y; y++ {
 			dst.Set(x+bb.Min.X, y+bb.Min.Y, col)
@@ -78,9 +87,9 @@ func DrawHLinear(dst draw.Image, x0, x1 float64, stops []Stop) {
 	}
 }
 
-// DrawVLinear draws a linear gradient to dst, and is optimized for producing a
+// drawVLinear draws a linear gradient to dst, and is optimized for producing a
 // purely vertical gradient.
-func DrawVLinear(dst draw.Image, y0, y1 float64, stops []Stop) {
+func drawVLinear(dst draw.Image, y0, y1 float64, stops []Stop) {
 	if y0 > y1 {
 		panic(fmt.Sprintf("invalid bounds y0(%f)>y1(%f)", y0, y1))
 	}
@@ -95,23 +104,8 @@ func DrawVLinear(dst draw.Image, y0, y1 float64, stops []Stop) {
 	y0, y1 = y0*float64(height), y1*float64(height)
 	dy := y1 - y0
 
-	var col color.Color
-
 	for y := 0; y < height; y++ {
-		fy := float64(y)
-		if fy < y0 {
-			col = stops[0].Col
-		} else {
-			d := (fy - y0) / dy
-			col = stops[len(stops)-1].Col
-			for i, stop := range stops[1:] {
-				if d < stop.X {
-					d = (d - stops[i].X) / (stop.X - stops[i].X)
-					col = collerp(stops[i].Col, stop.Col, d)
-					break
-				}
-			}
-		}
+		col := getColour((float64(y)-y0)/dy, stops)
 
 		for x := bb.Min.X; x < bb.Max.X; x++ {
 			dst.Set(x, y+bb.Min.Y, col)
@@ -124,12 +118,12 @@ func DrawVLinear(dst draw.Image, y0, y1 float64, stops []Stop) {
 // vertical, the appropriate optimized functions will be called.
 func DrawLinear(dst draw.Image, x0, y0, x1, y1 float64, stops []Stop) {
 	if y0 == y1 && x0 != x1 {
-		DrawHLinear(dst, x0, x1, stops)
+		drawHLinear(dst, x0, x1, stops)
 		return
 	}
 
 	if x0 == x1 && y0 != y1 {
-		DrawVLinear(dst, y0, y1, stops)
+		drawVLinear(dst, y0, y1, stops)
 		return
 	}
 
@@ -171,21 +165,86 @@ func DrawLinear(dst draw.Image, x0, y0, x1, y1 float64, stops []Stop) {
 				x2, y2 := x0+u*(px0-x0), y0+u*(py0-y0)
 				d := math.Hypot(fx-x2, fy-y2) / mag
 
-				if d < stops[0].X {
-					col = stops[0].Col
-				} else {
-					col = stops[len(stops)-1].Col
-					// iterate through stops to find the colour range
-					for i, st := range stops[1:] {
-						if d < st.X {
-							d = (d - stops[i].X) / (st.X - stops[i].X)
-							col = collerp(stops[i].Col, st.Col, d)
-							break
-						}
-					}
-				}
+				col = getColour(d, stops)
 			}
 			dst.Set(x+bb.Min.X, y+bb.Min.Y, col)
+		}
+	}
+}
+
+// drawSimpleRadial draws a simplified radial gradient with a centred focus.
+// It represents the gradient as a right cone with radius r and height 1.0. The
+// cone equation is x^2/a^2 + y^2/b^2 = z^2/c^2. Solving for z gives me the
+// ratio with which to interpolate step colours.
+
+func drawSimpleRadial(dst draw.Image, cx, cy, r float64, stops []Stop) {
+	if len(stops) == 0 {
+		return
+	}
+
+	bb := dst.Bounds()
+	width, height := bb.Dx(), bb.Dy()
+
+	a, b := r*float64(width), r*float64(height)
+	cx, cy = cx*float64(width), cy*float64(height)
+
+	for x := 0; x < width; x++ {
+		x2_a2 := ((float64(x) - cx) * (float64(x) - cx)) / (a * a)
+		for y := 0; y < height; y++ {
+			y2 := (float64(y) - cy) * (float64(y) - cy)
+			rat := math.Sqrt(x2_a2 + y2/(b*b))
+
+			dst.Set(x+bb.Min.X, y+bb.Min.Y, getColour(rat, stops))
+		}
+	}
+}
+
+// DrawRadial draws a radial gradient centred at cx, cy, with radius r, focused
+// at fx, fy, into dst. All numerical values are a treated as fraction of the
+// relevant dimension of dst. Values outside of [0.0,1.0] are accepted.
+// A quick path is used when the focus is at 0.0,0.0.
+// The algorithm is adapted from Maxim Shemanarev's Anti-Grain Geometry,
+// http://www.antigrain.com. Relevant file: agg_span_gradient.h.
+
+func DrawRadial(dst draw.Image, cx, cy, r, fx, fy float64, stops []Stop) {
+	if len(stops) == 0 {
+		return
+	}
+
+	if fx == cx && fy == cy {
+		drawSimpleRadial(dst, cx, cy, r, stops)
+		return
+	}
+
+	bb := dst.Bounds()
+	width, height := bb.Dx(), bb.Dy()
+
+	fx = (fx - cx) * float64(width)
+	fy = (fy - cy) * float64(height)
+	cx *= float64(width)
+	cy *= float64(height)
+	r *= float64(width)
+
+	yrat := float64(height) / float64(width)
+
+	f := math.Hypot(fx, fy)
+	if f > r {
+		fx = fx / f * (r - 1)
+		fy = fy / f * (r - 1)
+	}
+
+	r2 := r * r
+	mul := r / (r2 - (fx*fx + fy*fy))
+
+	for x := 0; x < width; x++ {
+		dx := float64(x) - cx - fx
+		dx2 := dx * dx
+		for y := 0; y < height; y++ {
+			dy := (float64(y) - cy - fy) / yrat
+			d2 := dx*fy - dy*fx
+			d3 := r2*(dx2+dy*dy) - d2*d2
+			rat := (dx*fx + dy*fy + math.Sqrt(math.Abs(d3))) * mul / r
+			dst.Set(x+bb.Min.X, y+bb.Min.Y, getColour(rat, stops))
 		}
 	}
 }
